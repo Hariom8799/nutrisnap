@@ -14,6 +14,7 @@ export default function LogFood() {
   const [foodName, setFoodName] = useState('')
   const [nutritionInfo, setNutritionInfo] = useState(null)
   const [userId, setUserId] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef(null)
   const router = useRouter()
   const { toast } = useToast()
@@ -27,7 +28,6 @@ export default function LogFood() {
       const response = await fetch('/api/auth/status')
       if (response.ok) {
         const data = await response.json()
-        console.log(data)
         setUserId(data.userId)
       } else {
         router.push('/auth/signin')
@@ -56,6 +56,7 @@ export default function LogFood() {
   const handleAnalyze = async () => {
     if (!foodImage) return
 
+    setIsLoading(true)
     try {
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
@@ -69,7 +70,11 @@ export default function LogFood() {
       setFoodName(data.foodName)
 
       // Fetch nutrition info
-      const nutritionResponse = await fetch(`/api/nutrition-info?food=${data.foodName}`)
+      const nutritionResponse = await fetch('/api/nutrition-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: data.foodName }),
+      })
       if (!nutritionResponse.ok) throw new Error('Failed to fetch nutrition info')
 
       const nutritionData = await nutritionResponse.json()
@@ -81,10 +86,12 @@ export default function LogFood() {
         description: 'Failed to analyze food',
         variant: 'destructive',
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleConfirm = async () => {
+  const handleAddFood = async () => {
     if (!userId || !nutritionInfo) return
 
     try {
@@ -93,22 +100,26 @@ export default function LogFood() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          foodName,
+          foodName: nutritionInfo.name,
           nutritionInfo,
         }),
       })
 
       if (!response.ok) throw new Error('Failed to log food')
 
-      // Reset form and show success message
-      setFoodImage(null)
-      setFoodName('')
-      setNutritionInfo(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
       toast({
         title: 'Success',
         description: 'Food logged successfully',
       })
+
+      // Reset form
+      setFoodImage(null)
+      setFoodName('')
+      setNutritionInfo(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+
+      // Redirect to dashboard
+      router.push('/dashboard')
     } catch (error) {
       console.error('Error logging food:', error)
       toast({
@@ -117,6 +128,14 @@ export default function LogFood() {
         variant: 'destructive',
       })
     }
+  }
+
+  const handleIgnore = () => {
+    // Reset form
+    setFoodImage(null)
+    setFoodName('')
+    setNutritionInfo(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   if (!userId) {
@@ -145,8 +164,8 @@ export default function LogFood() {
               <Image src={foodImage} alt="Food" layout="fill" objectFit="cover" />
             </div>
           )}
-          <Button onClick={handleAnalyze} disabled={!foodImage}>
-            Analyze Food
+          <Button onClick={handleAnalyze} disabled={!foodImage || isLoading}>
+            {isLoading ? 'Analyzing...' : 'Analyze Food'}
           </Button>
           {foodName && (
             <div>
@@ -161,8 +180,12 @@ export default function LogFood() {
                 <li>Protein: {nutritionInfo.protein}g</li>
                 <li>Carbs: {nutritionInfo.carbs}g</li>
                 <li>Fat: {nutritionInfo.fat}g</li>
+                <li>Serving Size: {nutritionInfo.serving_qty} {nutritionInfo.serving_unit}</li>
               </ul>
-              <Button onClick={handleConfirm}>Confirm Intake</Button>
+              <div className="flex space-x-2 mt-4">
+                <Button onClick={handleAddFood}>Add to Eaten Meals</Button>
+                <Button onClick={handleIgnore} variant="outline">Ignore</Button>
+              </div>
             </div>
           )}
         </CardContent>

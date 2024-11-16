@@ -3,17 +3,25 @@
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-const data = [
-  { date: '2024-03-01', calories: 2100 },
-  { date: '2024-03-02', calories: 1950 },
-  { date: '2024-03-03', calories: 2200 },
-  { date: '2024-03-04', calories: 2050 },
-  { date: '2024-03-05', calories: 2150 },
-  { date: '2024-03-06', calories: 2000 },
-  { date: '2024-03-07', calories: 2100 },
-]
+export function CalorieChart({ foodLogs }) {
+  const processData = () => {
+    const dailyCalories = foodLogs.reduce((acc, log) => {
+      const date = new Date(log.timestamp).toISOString().split('T')[0]
+      if (!acc[date]) {
+        acc[date] = 0
+      }
+      acc[date] += log.nutritionInfo.calories
+      return acc
+    }, {})
 
-export function CalorieChart() {
+    return Object.entries(dailyCalories)
+      .map(([date, calories]) => ({ date, calories }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(-7) // Get the last 7 days
+  }
+
+  const data = processData()
+
   return (
     <Card>
       <CardHeader>
@@ -24,9 +32,14 @@ export function CalorieChart() {
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
+            <XAxis 
+              dataKey="date" 
+              tickFormatter={(value) => new Date(value).toLocaleDateString()}
+            />
             <YAxis />
-            <Tooltip />
+            <Tooltip 
+              labelFormatter={(value) => new Date(value).toLocaleDateString()}
+            />
             <Legend />
             <Line type="monotone" dataKey="calories" stroke="#8884d8" activeDot={{ r: 8 }} />
           </LineChart>
