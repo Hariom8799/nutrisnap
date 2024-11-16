@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-const NUTRITIONIX_APP_ID = 'f15efe8c';
-const NUTRITIONIX_API_KEY = '3b9d21b727fd2074ec0ec678ce90a610';
+const NUTRITIONIX_APP_ID = process.env.NUTRITIONIX_APP_ID;
+const NUTRITIONIX_API_KEY = process.env.NUTRITIONIX_API_KEY;
 
 export async function POST(request) {
   try {
