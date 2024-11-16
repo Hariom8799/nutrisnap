@@ -1,9 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 
-
-
-export function DailyProgressWidget({ caloriesConsumed, calorieGoal, nutrients }) {
+export function DailyProgressWidget({ caloriesConsumed, calorieGoal, nutrients = [] }) {
   const caloriePercentage = Math.min((caloriesConsumed / calorieGoal) * 100, 100);
 
   return (
@@ -35,5 +33,5 @@ export function DailyProgressWidget({ caloriesConsumed, calorieGoal, nutrients }
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

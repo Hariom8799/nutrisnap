@@ -1,19 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from '@/hooks/use-toast'
+import { motion } from 'framer-motion'
 
 export default function Profile() {
-  const { data: session } = useSession()
   const router = useRouter()
   const { toast } = useToast()
+  const [userId, setUserId] = useState(null)
   const [profile, setProfile] = useState({
     age: '',
     gender: '',
@@ -26,30 +26,44 @@ export default function Profile() {
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    if (session?.user?.id) {
-      fetchProfile()
-    }
-  }, [session])
+    checkAuthStatus()
+  }, [])
 
-  const fetchProfile = async () => {
+  const checkAuthStatus = async () => {
     try {
-      const response = await fetch(`/api/user-profile?userId=${session.user.id}`)
+      const response = await fetch('/api/auth/status')
+      if (response.ok) {
+        const data = await response.json()
+        setUserId(data.userId)
+        fetchProfile(data.userId)
+      } else {
+        router.push('/auth/signin')
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to verify authentication',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const fetchProfile = async (id) => {
+    try {
+      const response = await fetch(`/api/user-profile?userId=${id}`)
       if (response.ok) {
         const data = await response.json()
         setProfile(data)
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to fetch profile data",
-          variant: "destructive",
-        })
+        throw new Error('Failed to fetch profile')
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to fetch profile',
+        variant: 'destructive',
       })
     }
   }
@@ -68,51 +82,95 @@ export default function Profile() {
     if (!profile.weight) newErrors.weight = 'Weight is required'
     if (!profile.activityLevel) newErrors.activityLevel = 'Activity level is required'
     if (!profile.goal) newErrors.goal = 'Goal is required'
-    if (!profile.dailyCalorieGoal) newErrors.dailyCalorieGoal = 'Daily calorie goal is required'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  const calculateBMR = () => {
+    const weight = parseFloat(profile.weight)
+    const height = parseFloat(profile.height)
+    const age = parseInt(profile.age)
+
+    if (profile.gender === 'male') {
+      return 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age)
+    } else {
+      return 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)
+    }
+  }
+
+  const calculateTDEE = (bmr) => {
+    const activityFactors = {
+      sedentary: 1.2,
+      'lightly active': 1.375,
+      'moderately active': 1.55,
+      'very active': 1.725,
+      'extra active': 1.9,
+    }
+    return bmr * activityFactors[profile.activityLevel]
+  }
+
+  const calculateDailyCalorieGoal = () => {
+    const bmr = calculateBMR()
+    const tdee = calculateTDEE(bmr)
+    let goalCalories = tdee
+
+    if (profile.goal === 'lose weight') {
+      goalCalories -= 500 // Create a calorie deficit
+    } else if (profile.goal === 'gain weight') {
+      goalCalories += 500 // Create a calorie surplus
+    }
+
+    return Math.round(goalCalories)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validateForm()) return
 
+    const calculatedCalories = calculateDailyCalorieGoal()
+    const updatedProfile = { ...profile, dailyCalorieGoal: calculatedCalories }
+
     try {
       const response = await fetch('/api/user-profile', {
         method: profile._id ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...profile, userId: session.user.id }),
+        body: JSON.stringify({ ...updatedProfile, userId }),
       })
 
       if (response.ok) {
         toast({
-          title: "Success",
-          description: "Profile updated successfully",
+          title: 'Success',
+          description: 'Profile updated successfully',
         })
         router.push('/dashboard')
       } else {
         toast({
-          title: "Error",
-          description: "Failed to save profile",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Failed to save profile',
+          variant: 'destructive',
         })
       }
     } catch (error) {
       console.error('Error saving profile:', error)
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'destructive',
       })
     }
   }
 
-  if (!session) {
-    return <div>Please sign in to access your profile.</div>
+  if (!userId) {
+    return <div>Loading...</div>
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-2xl mx-auto py-4"
+    >
       <Card>
         <CardHeader>
           <CardTitle>Profile & Goals</CardTitle>
@@ -129,11 +187,11 @@ export default function Profile() {
                 onChange={handleChange}
                 required
               />
-              {errors.age && <p className="text-red-500 text-sm mt-1">{errors.age}</p>}
+              {errors.age && <p className="text-red-500 text-sm">{errors.age}</p>}
             </div>
             <div>
               <Label htmlFor="gender">Gender</Label>
-              <Select name="gender" value={profile.gender} onValueChange={(value) => handleChange({ target: { name: 'gender', value } } )}>
+              <Select name="gender" value={profile.gender} onValueChange={(value) => handleChange({ target: { name: 'gender', value } })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
@@ -143,7 +201,7 @@ export default function Profile() {
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
+              {errors.gender && <p className="text-red-500 text-sm">{errors.gender}</p>}
             </div>
             <div>
               <Label htmlFor="height">Height (cm)</Label>
@@ -171,7 +229,7 @@ export default function Profile() {
             </div>
             <div>
               <Label htmlFor="activityLevel">Activity Level</Label>
-              <Select name="activityLevel" value={profile.activityLevel} onValueChange={(value) => handleChange({ target: { name: 'activityLevel', value } } )}>
+              <Select name="activityLevel" value={profile.activityLevel} onValueChange={(value) => handleChange({ target: { name: 'activityLevel', value } })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select activity level" />
                 </SelectTrigger>
@@ -187,7 +245,7 @@ export default function Profile() {
             </div>
             <div>
               <Label htmlFor="goal">Goal</Label>
-              <Select name="goal" value={profile.goal} onValueChange={(value) => handleChange({ target: { name: 'goal', value } } )}>
+              <Select name="goal" value={profile.goal} onValueChange={(value) => handleChange({ target: { name: 'goal', value } })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select goal" />
                 </SelectTrigger>
@@ -199,22 +257,12 @@ export default function Profile() {
               </Select>
               {errors.goal && <p className="text-red-500 text-sm mt-1">{errors.goal}</p>}
             </div>
-            <div>
-              <Label htmlFor="dailyCalorieGoal">Daily Calorie Goal</Label>
-              <Input
-                id="dailyCalorieGoal"
-                name="dailyCalorieGoal"
-                type="number"
-                value={profile.dailyCalorieGoal}
-                onChange={handleChange}
-                required
-              />
-              {errors.dailyCalorieGoal && <p className="text-red-500 text-sm mt-1">{errors.dailyCalorieGoal}</p>}
-            </div>
-            <Button type="submit" className="w-full">Save Profile</Button>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button type="submit" className="w-full">Save Profile</Button>
+            </motion.div>
           </form>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   )
 }

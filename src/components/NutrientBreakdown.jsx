@@ -3,22 +3,15 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function NutrientBreakdown({ foodLogs }) {
-  const totalNutrients = foodLogs.reduce((acc, log) => {
-    acc.protein += log.nutritionInfo.protein
-    acc.carbs += log.nutritionInfo.carbs
-    acc.fat += log.nutritionInfo.fat
-    return acc
-  }, { protein: 0, carbs: 0, fat: 0 })
+const data = [
+  { name: 'Carbs', value: 50 },
+  { name: 'Protein', value: 30 },
+  { name: 'Fat', value: 20 },
+]
 
-  const data = [
-    { name: 'Protein', value: totalNutrients.protein },
-    { name: 'Carbs', value: totalNutrients.carbs },
-    { name: 'Fat', value: totalNutrients.fat },
-  ]
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28']
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28']
-
+export function NutrientBreakdown() {
   return (
     <Card>
       <CardHeader>

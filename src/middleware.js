@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server'
-import { withAuth } from "next-auth/middleware"
+import { verifyToken } from '@/lib/auth'
 
-export default withAuth(
-  function middleware(req) {
-    console.log('Middleware executed for path:', req.nextUrl.pathname)
-    return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => {
-        console.log('Auth check for token:', token ? 'exists' : 'does not exist')
-        return !!token
-      }
-    },
+export async function middleware(request) {
+  const token = request.cookies.get('token')?.value
+
+  if (!token) {
+    return NextResponse.redirect(new URL('/auth/signin', request.url))
   }
-)
 
-export const config = { matcher: ["/dashboard", "/profile", "/log-food"] }
+  try {
+    await verifyToken(token)
+    return NextResponse.next()
+  } catch (error) {
+    console.error('Token verification failed:', error)
+    return NextResponse.redirect(new URL('/auth/signin', request.url))
+  }
+}
+
+export const config = {
+  matcher: ['/dashboard', '/profile', '/log-food'],
+}

@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { motion } from 'framer-motion'
 
-export default function SignIn() {
+export default function SignUp() {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -21,33 +22,29 @@ export default function SignIn() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/signin', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name, email, password }),
       })
 
       const data = await response.json()
 
-
       if (response.ok) {
         toast({
           title: 'Success',
-          description: 'Signed in successfully',
+          description: 'Account created successfully',
         })
-
-        
-        router.replace('/dashboard')
-        // console.log("im here ")
+        router.push('/auth/signin')
       } else {
         toast({
           title: 'Error',
-          description: data.message || 'Failed to sign in',
+          description: data.message || 'Failed to create account',
           variant: 'destructive',
         })
       }
     } catch (error) {
-      console.error('Sign-in error:', error)
+      console.error('Sign-up error:', error)
       toast({
         title: 'Error',
         description: 'An unexpected error occurred',
@@ -67,10 +64,19 @@ export default function SignIn() {
       >
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
+            <CardTitle>Sign Up</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -92,7 +98,7 @@ export default function SignIn() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isLoading ? 'Signing up...' : 'Sign Up'}
               </Button>
             </form>
           </CardContent>

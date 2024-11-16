@@ -1,19 +1,46 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useSession } from 'next-auth/react'
+import { useToast } from '@/hooks/use-toast'
 import Image from 'next/image'
 
 export default function LogFood() {
   const [foodImage, setFoodImage] = useState(null)
   const [foodName, setFoodName] = useState('')
   const [nutritionInfo, setNutritionInfo] = useState(null)
+  const [userId, setUserId] = useState(null)
   const fileInputRef = useRef(null)
-  const { data: session } = useSession()
+  const router = useRouter()
+  const { toast } = useToast()
+
+  useEffect(() => {
+    checkAuthStatus()
+  }, [])
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/auth/status')
+      if (response.ok) {
+        const data = await response.json()
+        console.log(data)
+        setUserId(data.userId)
+      } else {
+        router.push('/auth/signin')
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to verify authentication',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
@@ -49,19 +76,23 @@ export default function LogFood() {
       setNutritionInfo(nutritionData)
     } catch (error) {
       console.error('Error analyzing food:', error)
-      // Handle error (e.g., show error message to user)
+      toast({
+        title: 'Error',
+        description: 'Failed to analyze food',
+        variant: 'destructive',
+      })
     }
   }
 
   const handleConfirm = async () => {
-    if (!session || !nutritionInfo) return
+    if (!userId || !nutritionInfo) return
 
     try {
       const response = await fetch('/api/log-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: session.user.id,
+          userId,
           foodName,
           nutritionInfo,
         }),
@@ -74,15 +105,26 @@ export default function LogFood() {
       setFoodName('')
       setNutritionInfo(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
-      // Show success message to user
+      toast({
+        title: 'Success',
+        description: 'Food logged successfully',
+      })
     } catch (error) {
       console.error('Error logging food:', error)
-      // Handle error (e.g., show error message to user)
+      toast({
+        title: 'Error',
+        description: 'Failed to log food',
+        variant: 'destructive',
+      })
     }
   }
 
+  if (!userId) {
+    return <div>Loading...</div>
+  }
+
   return (
-    <div className="max-w-md mx-auto">
+    <div className="max-w-md mx-auto min-h-screen flex justify-center items-center">
       <Card>
         <CardHeader>
           <CardTitle>Log Your Food</CardTitle>
