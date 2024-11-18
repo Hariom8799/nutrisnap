@@ -10,12 +10,13 @@ import { useToast } from '@/hooks/use-toast'
 import Image from 'next/image'
 
 export default function LogFood() {
-  const [foodImage, setFoodImage] = useState(null)
+  const [foodImage, setFoodImage] = useState<File | null>(null)
   const [foodName, setFoodName] = useState('')
+  const [confidence, setConfidence] = useState(0)
   const [nutritionInfo, setNutritionInfo] = useState(null)
   const [userId, setUserId] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const fileInputRef = useRef(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -45,11 +46,7 @@ export default function LogFood() {
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setFoodImage(reader.result )
-      }
-      reader.readAsDataURL(file)
+      setFoodImage(file)
     }
   }
 
@@ -58,16 +55,22 @@ export default function LogFood() {
 
     setIsLoading(true)
     try {
+      const formData = new FormData()
+      formData.append('file', foodImage)
+
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: foodImage }),
+        body: formData,
       })
 
-      if (!response.ok) throw new Error('Failed to analyze food')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to analyze food')
+      }
 
       const data = await response.json()
       setFoodName(data.foodName)
+      setConfidence(data.confidence)
 
       // Fetch nutrition info
       const nutritionResponse = await fetch('/api/nutrition-info', {
@@ -83,7 +86,7 @@ export default function LogFood() {
       console.error('Error analyzing food:', error)
       toast({
         title: 'Error',
-        description: 'Failed to analyze food',
+        description: error.message || 'Failed to analyze food',
         variant: 'destructive',
       })
     } finally {
@@ -100,7 +103,7 @@ export default function LogFood() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          foodName: nutritionInfo.name,
+          foodName,
           nutritionInfo,
         }),
       })
@@ -115,6 +118,7 @@ export default function LogFood() {
       // Reset form
       setFoodImage(null)
       setFoodName('')
+      setConfidence(0)
       setNutritionInfo(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
 
@@ -134,6 +138,7 @@ export default function LogFood() {
     // Reset form
     setFoodImage(null)
     setFoodName('')
+    setConfidence(0)
     setNutritionInfo(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -161,7 +166,12 @@ export default function LogFood() {
           </div>
           {foodImage && (
             <div className="relative w-full h-48">
-              <Image src={foodImage} alt="Food" layout="fill" objectFit="cover" />
+              <Image 
+                src={URL.createObjectURL(foodImage)} 
+                alt="Food" 
+                layout="fill" 
+                objectFit="cover" 
+              />
             </div>
           )}
           <Button onClick={handleAnalyze} disabled={!foodImage || isLoading}>
@@ -170,6 +180,7 @@ export default function LogFood() {
           {foodName && (
             <div>
               <p>Detected Food: {foodName}</p>
+              <p>Confidence: {(confidence * 100).toFixed(2)}%</p>
             </div>
           )}
           {nutritionInfo && (
